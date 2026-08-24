@@ -1,0 +1,29 @@
+/**
+ * Amount conversion.
+ *
+ * Both **MultiSafepay** and **Propeller** represent amounts as an integer
+ * number of **cents** (minor units), e.g. `1000` for ten euros. So — unlike the
+ * Mollie provider, which had to format a `"10.00"` decimal string for Mollie —
+ * there is a single conversion here: major units → integer cents.
+ *
+ * The WordPress plugin did `(int) round(floatval($value) * 100)`. Naive
+ * `value * 100` in JS hits floating-point error (`1.1 * 100 === 110.00000000000001`),
+ * so we round explicitly. `Math.round` is correct here for the cent precision we
+ * need across realistic order totals.
+ */
+
+/**
+ * Convert a major-unit amount (number or decimal string, e.g. `10` / `"9.90"`)
+ * to an integer number of cents for both the MultiSafepay `amount` field and
+ * Propeller inputs.
+ *
+ * @throws if the value is not a finite, non-negative number.
+ */
+export function toCents(value: string | number): number {
+  const major = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(major) || major < 0) {
+    throw new Error(`Invalid amount for cents conversion: ${JSON.stringify(value)}`);
+  }
+  // Round at the cent boundary to absorb binary-float drift.
+  return Math.round(major * 100);
+}
