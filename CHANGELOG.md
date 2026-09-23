@@ -6,6 +6,23 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 once it reaches 1.0. Until then (the `0.x` line) the public API may change
 between minor versions.
 
+## [0.1.3] - 2026-09-23
+
+### Changed
+
+- Releases now publish from GitHub Actions using npm trusted publishing (OIDC)
+  instead of a long-lived npm token in GitLab CI. No package code changed; this
+  version exists to exercise the new path end to end.
+
+  npm only accepts github.com, gitlab.com and CircleCI as OIDC issuers, and our
+  GitLab is self-hosted, so it cannot mint a token npm will accept. Meanwhile
+  2FA-bypass tokens — the only thing that made non-interactive publishing work —
+  lose the ability to publish directly around January 2027. Publishing therefore
+  moves to the public mirror, where the runner mints a short-lived token scoped
+  to that repository and workflow, and no publish credential is stored anywhere.
+
+  Tarballs from this version on carry npm provenance attestation.
+
 ## [0.1.2] - 2026-07-22
 
 ### Changed

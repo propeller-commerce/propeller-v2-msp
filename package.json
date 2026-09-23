@@ -1,6 +1,6 @@
 {
   "name": "@propeller-commerce/propeller-v2-msp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "MultiSafepay PSP payment provider for the Propeller eCommerce V2 platform — drives MultiSafepay payments through the Propeller GraphQL API via @propeller-commerce/propeller-sdk-v2. Server-side, framework-agnostic, zero PSP runtime deps (talks to the MultiSafepay JSON API over fetch).",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
