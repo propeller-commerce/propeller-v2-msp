@@ -35,10 +35,23 @@ describe('verifyWebhookSignature', () => {
     expect(verifyWebhookSignature(body, auth, API_KEY, 600)).toBe(false);
   });
 
-  it('accepts a stale timestamp when the window is disabled (0)', () => {
-    const auth = makeAuth(body, now - 100000);
-    expect(verifyWebhookSignature(body, auth, API_KEY, 0)).toBe(true);
+  it('rejects a timestamp more than the window in the future', () => {
+    expect(verifyWebhookSignature(body, makeAuth(body, now + 601), API_KEY, 600)).toBe(false);
+    expect(verifyWebhookSignature(body, makeAuth(body, now + 100000), API_KEY)).toBe(false);
   });
+
+  it('accepts a timestamp slightly in the future (clock skew inside the window)', () => {
+    expect(verifyWebhookSignature(body, makeAuth(body, now + 30), API_KEY, 600)).toBe(true);
+  });
+
+  it.each([0, -1, NaN, Infinity, -Infinity])(
+    'a window of %p does not disable the freshness check: the 600s default applies',
+    (window) => {
+      expect(verifyWebhookSignature(body, makeAuth(body, now - 100000), API_KEY, window)).toBe(false);
+      expect(verifyWebhookSignature(body, makeAuth(body, now + 100000), API_KEY, window)).toBe(false);
+      expect(verifyWebhookSignature(body, makeAuth(body, now - 300), API_KEY, window)).toBe(true);
+    }
+  );
 
   it('rejects missing / malformed headers and empty key', () => {
     const auth = makeAuth(body, now);

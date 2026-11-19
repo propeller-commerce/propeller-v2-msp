@@ -4,7 +4,8 @@
  * MultiSafepay signs POST webhooks with an `Auth` header: base64 of
  * `"{timestamp}:{sha512hex}"`, where `sha512hex` is
  * `HMAC-SHA512(key = trim(apiKey), message = "{timestamp}:{rawBody}")` as
- * lowercase hex. A freshness window (default 600s) rejects replays.
+ * lowercase hex. A freshness window (default 600s) rejects replays and
+ * timestamps from the future.
  *
  * Faithful port of the SDK's `Util/Notification::verifyNotification`. The
  * WordPress plugin does NOT call it (it re-fetches the order to confirm state),
@@ -18,6 +19,8 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 
+const DEFAULT_WINDOW_SECONDS = 600;
+
 /**
  * Verify a MultiSafepay webhook signature.
  *
@@ -25,15 +28,16 @@ import { createHmac, timingSafeEqual } from 'crypto';
  *   re-serialized body will not match the signature).
  * @param authHeader The value of the inbound `Auth` header.
  * @param apiKey The MultiSafepay API key (same one used for API calls).
- * @param validationWindowSeconds Reject if the signed timestamp is older than
- *   this many seconds (default 600). Pass 0 to disable the freshness check.
+ * @param validationWindowSeconds Reject if the signed timestamp is more than
+ *   this many seconds in the past or the future (default 600). A value that is
+ *   not a positive finite number uses the default: the check can't be disabled.
  * @returns true only if the signature is present, fresh, and matches.
  */
 export function verifyWebhookSignature(
   rawBody: string,
   authHeader: string | null | undefined,
   apiKey: string,
-  validationWindowSeconds = 600
+  validationWindowSeconds = DEFAULT_WINDOW_SECONDS
 ): boolean {
   if (!authHeader || !apiKey) return false;
 
@@ -50,14 +54,15 @@ export function verifyWebhookSignature(
   const providedHex = decoded.slice(sep + 1);
   if (!timestamp || !providedHex) return false;
 
-  if (validationWindowSeconds > 0) {
-    const ts = Number(timestamp);
-    // `Date.now()` is unavailable in some sandboxes but this runs at request
-    // time in a real host; guard against a non-finite timestamp.
-    if (!Number.isFinite(ts)) return false;
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    if (ts + validationWindowSeconds < nowSeconds) return false;
-  }
+  const windowSeconds =
+    Number.isFinite(validationWindowSeconds) && validationWindowSeconds > 0
+      ? validationWindowSeconds
+      : DEFAULT_WINDOW_SECONDS;
+  // MultiSafepay signs with a Unix timestamp in seconds.
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts)) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - ts) > windowSeconds) return false;
 
   const expectedHex = createHmac('sha512', apiKey.trim())
     .update(`${timestamp}:${rawBody}`)

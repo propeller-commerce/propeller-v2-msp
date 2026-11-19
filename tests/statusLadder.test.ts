@@ -19,20 +19,20 @@ describe('classifyTransaction — the MultiSafepay webhook status ladder', () =>
     }
   );
 
-  it('initialized → OPEN / UNFINISHED, fulfil (backend cart)', () => {
+  it('initialized → OPEN / UNFINISHED, no fulfil (plugin parity)', () => {
     const out = classifyTransaction({ status: 'initialized' })!;
     expect(out.transactionStatus).toBe(TransactionStatuses.OPEN);
     expect(out.paymentStatus).toBe(PaymentStatuses.OPEN);
     expect(out.orderStatus).toBe(OrderStatus.UNFINISHED);
-    expect(out.deleteCart).toBe(true);
+    expect(out.deleteCart).toBe(false);
   });
 
-  it('uncleared → PENDING / UNFINISHED, fulfil (backend cart)', () => {
+  it('uncleared → PENDING / UNFINISHED, no fulfil (plugin parity)', () => {
     const out = classifyTransaction({ status: 'uncleared' })!;
     expect(out.transactionStatus).toBe(TransactionStatuses.PENDING);
     expect(out.paymentStatus).toBe(PaymentStatuses.PENDING);
     expect(out.orderStatus).toBe(OrderStatus.UNFINISHED);
-    expect(out.deleteCart).toBe(true);
+    expect(out.deleteCart).toBe(false);
   });
 
   it('declined → FAILED / UNFINISHED, no fulfil', () => {

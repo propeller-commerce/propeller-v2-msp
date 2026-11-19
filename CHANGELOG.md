@@ -6,6 +6,81 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 once it reaches 1.0. Until then (the `0.x` line) the public API may change
 between minor versions.
 
+## [0.1.4] - 2026-11-19
+
+### Security
+
+- **`handleWebhook` only acts on a transaction that pays the order** (security
+  review #19). It loads the Propeller order (`status`, `currency`,
+  `total.net`) and writes nothing (no payment update, no `orderSetStatus`, no
+  mail / PDF / `deleteCart`) unless MultiSafepay's amount equals the order's
+  VAT-inclusive total in whole cents and the currencies match. Before, a
+  one-cent transaction created against any order id set that order to
+  `NEW` / `PAID` with the confirmation mail, and an `initialized` /
+  `uncleared` one cleared its cart. Mismatches and unknown orders return
+  `{ ok: false, error }` and log the order id and both amounts.
+- The confirmation mail, PDF, confirm event and `deleteCart` now run only while
+  the order is still `UNFINISHED` and the outcome changes its status or pay
+  status, so a replayed notification (the webhook URL accepts any
+  `transactionid`) or a later refund no longer sends the confirmation again.
+- **`initialized` / `uncleared` no longer fulfil.** They keep the order
+  `UNFINISHED`, so before, every delivery of either status (also an unsigned
+  GET with a guessed order id) re-sent the confirmation mail, PDF and confirm
+  event and cleared the backend cart. They now only update the payment and pay
+  status, as the WordPress plugin's `webhook.php` does; `completed` /
+  `reserved` / `shipped` fulfil when they arrive. The backend cart is now kept
+  until the payment completes.
+- **A non-paying outcome no longer downgrades a placed order.** Once the
+  Propeller order has left `UNFINISHED`, an `initialized` / `uncleared` /
+  `declined` / `cancelled` / `void` / `expired` transaction writes nothing and
+  returns
+  `{ ok: false, error: 'order is already <status>; <status> transaction ignored' }`.
+  Before, such a transaction for the order's total set the order back to
+  `UNFINISHED` with pay status `CANCELLED` / `EXPIRED` / …. A `completed` /
+  `reserved` / `shipped` notification for an order whose pay status is already
+  `PAID` is now a no-op (`ok: true`, nothing written). Refunds and chargebacks
+  are unchanged: `refunded` / `partial_refunded` append a `REFUND` transaction
+  and keep the order `NEW` / `PAID`; `chargedback` appends a `CHARGEBACK`
+  transaction and sets the pay status to `CHARGEBACK`; neither re-sends the
+  confirmation. The order lookup now also selects `paymentData { status }`.
+- **The order-lookup fallback no longer elevates `passwordResetLink`.** For a
+  host client without its own `orderEditorMutations`, the package wrote a copy
+  of the old SDK default list onto it, `passwordResetLink` included, so that
+  mutation (which returns the reset link) went out with the order-editor key.
+  The fallback is now `orderSetStatus`, `triggerQuoteSendRequest`,
+  `triggerOrderSendConfirm` plus the lookup's own operation, matching the SDK's
+  new default. A host that lists `passwordResetLink` itself keeps its list.
+- **`verifyWebhookSignature` rejects timestamps from the future and can't be
+  switched off.** It only rejected a signed timestamp older than the window, so
+  a signature made with a far-future timestamp stayed valid indefinitely, and a
+  window of `0` (or any value `<= 0`) disabled the freshness check. A
+  timestamp more than the window ahead of the clock is now rejected too, and a
+  window that isn't a positive finite number falls back to the 600 s default.
+- **README webhook examples verify first.** The Next.js and Express examples
+  called `handleWebhook` with the query's `transactionid` and no checks. They
+  now verify the `Auth` signature over the raw body and require the signed
+  body's `order_id` to equal the query's id before calling `handleWebhook`.
+
+### Added
+
+- `MspProvider#verifyWebhookSignature(rawBody, authHeader, validationWindowSeconds = 600)`:
+  checks the notification's `Auth` header with the API key the provider runs
+  with (test or live per `testMode`). Hosts should call it before
+  `handleWebhook`; see the README.
+
+### Changed
+
+- Orders are created with `payment_options.notification_method: 'POST'`, so
+  notifications carry the signed `Auth` header (GET notifications are
+  unsigned). The transaction id stays in the query string, so webhook routes
+  that read `?transactionid=` keep working.
+- The order lookup runs under the order-editor key: on the first webhook the
+  package adds its operation name `propellerPspOrderTotal` to the injected
+  client's `orderEditorMutations` (falling back to the SDK defaults, minus
+  `passwordResetLink`, when the host set none). No host change needed. Hosts
+  must charge `order.total.net` (incl. VAT); a payment of the ex-VAT total
+  (`totalGross`) is now refused.
+
 ## [0.1.3] - 2026-09-23
 
 ### Changed

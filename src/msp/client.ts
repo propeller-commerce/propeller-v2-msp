@@ -21,6 +21,7 @@
 
 import type { MspProviderConfig } from '../types';
 import type { MspTransactionSnapshot } from './statusLadder';
+import { verifyWebhookSignature } from './verify';
 
 /** MultiSafepay API base URLs. */
 export const MSP_LIVE_URL = 'https://api.multisafepay.com/v1/';
@@ -138,6 +139,15 @@ export class MspGateway {
     return envelope.data;
   }
 
+  /** Verify a POST notification's `Auth` header with the active API key. */
+  verifySignature(
+    rawBody: string,
+    authHeader: string | null | undefined,
+    validationWindowSeconds?: number
+  ): boolean {
+    return verifyWebhookSignature(rawBody, authHeader, this.apiKey, validationWindowSeconds);
+  }
+
   /** Create a MultiSafepay redirect order and return its id + payment URL. */
   async createOrder(params: MspOrderCreateParams): Promise<MspOrderCreated> {
     const body: Record<string, unknown> = {
@@ -148,6 +158,9 @@ export class MspGateway {
       description: params.description,
       payment_options: {
         notification_url: params.notificationUrl,
+        // POST notifications carry the signed `Auth` header; GET ones are
+        // unsigned. The id stays in the query string (`?transactionid=`).
+        notification_method: 'POST',
         redirect_url: params.redirectUrl,
         cancel_url: params.cancelUrl,
         close_window: true,

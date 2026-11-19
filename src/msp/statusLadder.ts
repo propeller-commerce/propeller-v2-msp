@@ -48,8 +48,8 @@ export interface PropellerStatusOutcome {
  * Mirrors `webhook.php` (with the two corrections noted above):
  *  - completed  → PAID / NEW, clear cart                 (money captured)
  *  - reserved   → PAID / NEW, clear cart                 (plugin treats as paid)
- *  - initialized→ PENDING / UNFINISHED, clear cart       (awaiting payment)
- *  - uncleared  → PENDING / UNFINISHED, clear cart       (awaiting manual review)
+ *  - initialized→ OPEN / UNFINISHED                     (awaiting payment)
+ *  - uncleared  → PENDING / UNFINISHED                  (awaiting manual review)
  *  - shipped    → PAID / NEW, clear cart                 (post-fulfilment)
  *  - declined   → FAILED / UNFINISHED
  *  - cancelled  → CANCELLED / UNFINISHED
@@ -80,14 +80,15 @@ export function classifyTransaction(
         deleteCart: true,
       };
 
-    // Awaiting payment / manual clearing — order not final yet.
+    // Awaiting payment / manual clearing — order not final yet. No mail and
+    // the cart stays, as in the plugin's webhook.php; `completed` fulfils.
     case 'initialized':
       return {
         transactionType: TransactionTypes.PAY,
         transactionStatus: TransactionStatuses.OPEN,
         paymentStatus: PaymentStatuses.OPEN,
         orderStatus: OrderStatus.UNFINISHED,
-        deleteCart: true,
+        deleteCart: false,
       };
     case 'uncleared':
       return {
@@ -95,7 +96,7 @@ export function classifyTransaction(
         transactionStatus: TransactionStatuses.PENDING,
         paymentStatus: PaymentStatuses.PENDING,
         orderStatus: OrderStatus.UNFINISHED,
-        deleteCart: true,
+        deleteCart: false,
       };
 
     // Failure states — keep the cart so the shopper can retry.

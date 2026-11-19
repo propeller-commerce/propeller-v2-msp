@@ -1,4 +1,4 @@
-import { toCents } from '../src/propeller/amounts';
+import { toCents, matchesOrderTotal } from '../src/propeller/amounts';
 
 describe('toCents', () => {
   it('converts whole major units to cents', () => {
@@ -21,5 +21,21 @@ describe('toCents', () => {
     expect(() => toCents(-1)).toThrow();
     expect(() => toCents('abc')).toThrow();
     expect(() => toCents(Infinity)).toThrow();
+  });
+});
+
+describe('matchesOrderTotal', () => {
+  it('whole-cent totals must match exactly; sub-cent totals match either neighbouring cent', () => {
+    expect(matchesOrderTotal(1107, 'EUR', 11.07, 'EUR')).toBe(true);
+    expect(matchesOrderTotal(1108, 'EUR', 11.07, 'EUR')).toBe(false);
+    expect(matchesOrderTotal(1339, 'EUR', 13.3947, 'EUR')).toBe(true);
+    expect(matchesOrderTotal(1340, 'EUR', 13.3947, 'EUR')).toBe(true);
+    expect(matchesOrderTotal(1338, 'EUR', 13.3947, 'EUR')).toBe(false);
+  });
+
+  it('rejects the ex-VAT total, another currency and non-integer cents', () => {
+    expect(matchesOrderTotal(1107, 'EUR', 13.3947, 'EUR')).toBe(false);
+    expect(matchesOrderTotal(1107, 'USD', 11.07, 'EUR')).toBe(false);
+    expect(matchesOrderTotal(1107.5, 'EUR', 11.075, 'EUR')).toBe(false);
   });
 });

@@ -121,7 +121,7 @@ export interface PaymentStatusResult {
 
 /** Result of `handleWebhook`. Always resolves; never throws out of the webhook. */
 export interface HandleWebhookResult {
-  /** Whether the order was found, classified, and Propeller updated. */
+  /** Whether the order was found, classified, and Propeller updated (or already up to date). */
   ok: boolean;
   /** MultiSafepay order/payment id processed. */
   paymentId: string;
